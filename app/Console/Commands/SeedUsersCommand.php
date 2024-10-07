@@ -7,7 +7,7 @@ use Illuminate\Console\Command;
 
 class SeedUsersCommand extends Command
 {
-    protected $signature = 'db:refresh-and-seed {--count=100 : The number of users to seed}';
+    protected $signature = 'db:refresh-and-seed {--count=100 : The number of users to seed} {--force : Force the operation to run without confirmation}';
 
     protected $description = 'Refresh the database and seed users';
 
@@ -15,12 +15,12 @@ class SeedUsersCommand extends Command
     {
         $count = (int) $this->option('count');
 
-        if (!$this->confirm("This will refresh your database and seed {$count} users. Do you wish to continue?")) {
+        if (!$this->option('force') && !$this->confirm("This will refresh your database and seed {$count} users. Do you wish to continue?")) {
             $this->info('Command cancelled.');
             return;
         }
 
-        $this->call('migrate:fresh');
+        $this->call('migrate:fresh', ['--force' => true]);
 
         $this->info("Seeding {$count} users...");
         User::factory()->count($count)->create();

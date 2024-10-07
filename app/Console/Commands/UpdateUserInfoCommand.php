@@ -12,10 +12,13 @@ class UpdateUserInfoCommand extends Command
     protected $signature = 'users:update {count? : Number of users to update}';
     protected $description = 'Update users with random names or timezones';
 
+    protected $customTimezones = ['CEST', 'CST', 'GMT+1'];
+
     public function handle()
     {
         $faker = Faker::create();
         $timezones = DateTimeZone::listIdentifiers(DateTimeZone::ALL);
+        $allTimezones = array_merge($this->customTimezones, $timezones);
 
         $totalUsers = User::count();
         $count = $this->argument('count');
@@ -39,7 +42,7 @@ class UpdateUserInfoCommand extends Command
                 $this->info("Updated user {$user->id}: Name changed from '{$oldName}' to '{$newName}'");
             } else {
                 $oldTimezone = $user->timezone;
-                $newTimezone = $faker->randomElement($timezones);
+                $newTimezone = $faker->randomElement($allTimezones);
                 $user->timezone = $newTimezone;
                 $this->info("Updated user {$user->id}: Timezone changed from '{$oldTimezone}' to '{$newTimezone}'");
             }
