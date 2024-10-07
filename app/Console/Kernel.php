@@ -14,7 +14,7 @@ class Kernel extends ConsoleKernel
     {
         // $schedule->command('inspire')->hourly();
         // Add your scheduled tasks here.
-        $schedule->command('users:sync-with-api')->everyFifteenMinutes();
+        $schedule->command('users:sync')->hourly();
     }
 
     /**
