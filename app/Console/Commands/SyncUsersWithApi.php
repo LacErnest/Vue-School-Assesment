@@ -11,79 +11,70 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class SyncUsersWithApi extends Command
+class SyncUsersCommand extends Command
 {
-    protected $signature = 'users:sync-with-api';
-    protected $description = 'Simulate syncing changed user attributes with the third-party API';
+    protected $signature = 'users:sync';
+    protected $description = 'Simulate syncing user attributes with third-party API';
 
-    private int $batchSize = 1000;
-    private int $batchLimit = 50;
-    private int $individualLimit = 3800;
+    private const BATCH_SIZE = 1000;
+    private const BATCH_LIMIT_PER_HOUR = 50;
+    private const INDIVIDUAL_LIMIT_PER_HOUR = 3800;
 
-    public function handle(): int
+    public function handle()
     {
-        $changedUsers = User::where('needs_sync', true)
-            ->take($this->individualLimit)
-            ->get();
-        
-        $batches = $changedUsers->chunk($this->batchSize);
-        
+        $users = User::where('needs_sync', true)
+                     ->take(self::INDIVIDUAL_LIMIT_PER_HOUR)
+                     ->get();
+
         $totalUpdates = 0;
         $batchCount = 0;
-        
-        foreach ($batches as $batch) {
-            if ($batchCount >= $this->batchLimit) {
+
+        foreach ($users->chunk(self::BATCH_SIZE) as $batch) {
+            if ($batchCount >= self::BATCH_LIMIT_PER_HOUR) {
                 $this->info("Batch limit reached. Stopping for this run.");
                 break;
             }
-            
-            $this->processBatch($batch, $batchCount);
-            
-            $totalUpdates += $batch->count();
-            $this->markUsersAsSynced($batch);
-            
+
+            $this->processBatch($batch, $totalUpdates);
+
             $batchCount++;
+            $totalUpdates += $batch->count();
         }
-        
-        $this->info("User synchronization simulation completed. Total updates: {$totalUpdates}");
-        
-        return Command::SUCCESS;
+
+        $this->info("Total updates simulated: $totalUpdates");
     }
 
-    /**
-     * Process a batch of users and log their updates.
-     *
-     * @param \Illuminate\Support\Collection $batch
-     * @param int $batchNumber
-     */
-    private function processBatch($batch, int $batchNumber): void
+    private function processBatch($batch, &$totalUpdates)
     {
-        foreach ($batch as $index => $user) {
-            $userIndex = ($batchNumber * $this->batchSize) + $index + 1;
-            $updates = [];
+        $batchPayload = [
+            'batches' => [
+                'subscribers' => []
+            ]
+        ];
+
+        foreach ($batch as $user) {
+            $userData = [
+                'email' => $user->email
+            ];
 
             if ($user->isDirty('name')) {
-                $updates[] = "firstname: {$user->name}";
+                $userData['name'] = $user->name;
             }
+
             if ($user->isDirty('timezone')) {
-                $updates[] = "timezone: '{$user->timezone}'";
+                $userData['time_zone'] = $user->timezone;
             }
 
-            if (!empty($updates)) {
-                $updateString = implode(', ', $updates);
-                Log::info("[{$userIndex}] {$updateString}");
-                $this->info("[{$userIndex}] {$updateString}");
-            }
+            $batchPayload['batches']['subscribers'][] = $userData;
+            $updateInfo = "[" . ++$totalUpdates . "] ";
+            $updateInfo .= isset($userData['name']) ? "firstname: {$userData['name']}, " : "";
+            $updateInfo .= isset($userData['time_zone']) ? "timezone: '{$userData['time_zone']}'" : "";
+            Log::info($updateInfo);
+            $this->info($updateInfo);
+
+            $user->needs_sync = false;
+            $user->save();
         }
-    }
-
-    /**
-     * Mark users as synced in the database.
-     *
-     * @param \Illuminate\Support\Collection $batch
-     */
-    private function markUsersAsSynced($batch): void
-    {
-        User::whereIn('email', $batch->pluck('email'))->update(['needs_sync' => false]);
+        Log::info("Simulated API call with payload: " . json_encode($batchPayload));
     }
 }
