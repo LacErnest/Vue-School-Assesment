@@ -3,16 +3,16 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
-use Faker\Factory as Faker;
 use Illuminate\Database\Seeder;
 
 class UserSeeder extends Seeder
 {
     public function run()
     {
-        User::factory()
-        ->count(20)
-        ->create();
+        $count = $this->command->option('count') ?? 20;
+
+        User::factory()->count($count)->create();
+
+        $this->command->info("{$count} users created successfully.");
     }
 }

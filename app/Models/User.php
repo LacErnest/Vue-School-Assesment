@@ -44,4 +44,13 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    protected static function booted()
+    {
+        static::updating(function ($user) {
+            if ($user->isDirty('name') || $user->isDirty('timezone')) {
+                $user->setAttribute('needs_sync', true);
+            }
+        });
+    }
 }
